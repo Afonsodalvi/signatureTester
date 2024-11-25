@@ -1,0 +1,63 @@
+```javascript
+curl -X POST http://localhost:8080/deploy \
+-H "Content-Type: application/json" \
+-d '{
+  "walletID": "73558bc0-b785-47ca-823a-7c5d5d382841",
+  "owner": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "baseURI": "https://base.uri/",
+  "name": "TokenName",
+  "symbol": "TKN",
+  "backend": "0xAF3f69DE05EFE56D012a515F11D835038FEE63F2",
+  "addressWithdraw": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "maxSupplyEach": [1000, 2000, 3000],
+  "reqSignature": true,
+  "salt": "some-random-salt4"
+}'
+```
+
+
+```javascript
+curl -X POST http://localhost:8080/mint \
+-H "Content-Type: application/json" \
+-d '{
+  "walletID": "73558bc0-b785-47ca-823a-7c5d5d382841",
+  "owner": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "quantity": 1,
+  "ids": [1],
+  "salt": "some-random-salt4"
+}'
+```
+
+Rotas usando a smartwallet:
+
+```javascript
+curl -X POST http://localhost:8080/deploy-smart-wallet \
+-H "Content-Type: application/json" \
+-d '{
+  "walletID": "73558bc0-b785-47ca-823a-7c5d5d382841",
+  "owner": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "baseURI": "https://base.uri/",
+  "name": "TokenName",
+  "symbol": "TKN",
+  "backend": "0xAF3f69DE05EFE56D012a515F11D835038FEE63F2",
+  "addressWithdraw": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "maxSupplyEach": [1000, 2000, 3000],
+  "reqSignature": true,
+  "salt": "some-random-salt5"
+}'
+```
+
+```javascript
+curl -X POST http://localhost:8080/mint-smart-wallet \
+-H "Content-Type: application/json" \
+-d '{
+  "walletID": "73558bc0-b785-47ca-823a-7c5d5d382841",
+  "owner": "0x8ad2474763439b87de8ddd83414936370be4f796",
+  "quantity": 1,
+  "ids": [1],
+  "salt": "some-random-salt5"
+}'
+```
+
+obs. alterem os salts
+- exemplo de um mint: https://amoy.polygonscan.com/tx/0x2cb72c4c38acb6d3121e864ba5e46531de1733f969200f291bc6958e7f86491e
