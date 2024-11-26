@@ -39,11 +39,11 @@ curl -X POST http://localhost:8080/deploy-smart-wallet \
   "baseURI": "https://base.uri/",
   "name": "TokenName",
   "symbol": "TKN",
-  "backend": "0xAF3f69DE05EFE56D012a515F11D835038FEE63F2",
+  "backend": "0x5bb7dd6a6eb4a440d6C70e1165243190295e290B",
   "addressWithdraw": "0x8ad2474763439b87de8ddd83414936370be4f796",
   "maxSupplyEach": [1000, 2000, 3000],
   "reqSignature": true,
-  "salt": "some-random-salt5"
+  "salt": "some-random-salt51"
 }'
 ```
 
@@ -61,3 +61,13 @@ curl -X POST http://localhost:8080/mint-smart-wallet \
 
 obs. alterem os salts
 - exemplo de um mint: https://amoy.polygonscan.com/tx/0x2cb72c4c38acb6d3121e864ba5e46531de1733f969200f291bc6958e7f86491e
+
+
+```javascript
+curl -X POST http://localhost:8080/recover-public-key \
+-H "Content-Type: application/json" \
+-d '{
+  "hash": "0x068ce90db513213e6da9744ef2884a7aca1228b4b2228b05878293860ecd6bca",
+  "signature": "0x7fa8e43fe5a7330d229d7f6f577a6177b2ef18c48a919ae33950cb451bf565a83c40175845eb6462dbdda0844653a7b06af4013bc50fab58f284f10e0a70382d00"
+}'
+```

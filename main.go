@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"crypto/ecdsa"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -101,7 +102,7 @@ func InitiateMintTransaction(walletID string, quantity uint64, ids []uint64, sal
 
 	transactionPayload := map[string]interface{}{
 		"walletId":        walletID,
-		"contractAddress": "0x841e6D1dcf65ca10e2f04D3c04c837B6dba5a673",
+		"contractAddress": "0x2019158cA6820188875C4ecCFf875B6F849E77bc",
 		"operations": []map[string]interface{}{
 			{
 				"functionSignature": "mint(uint256,uint256[],string,bytes)",
@@ -148,7 +149,7 @@ func InitiateMintTransaction(walletID string, quantity uint64, ids []uint64, sal
 }
 
 // generateSignature gera o hash e assina os dados
-func generateSignature(contractAddress, msgSender, salt string, blockchainID uint64) (string, error) {
+func generateSignature(contractAddress, msgSender, salt string, blockchainID uint64) (string, string, error) {
 	contractAddressBytes := common.HexToAddress(contractAddress).Bytes()
 	msgSenderBytes := common.HexToAddress(msgSender).Bytes()
 
@@ -157,29 +158,69 @@ func generateSignature(contractAddress, msgSender, salt string, blockchainID uin
 
 	saltBytes := []byte(salt)
 
+	// Monta os dados para o hash
 	dataToHash := append(contractAddressBytes, msgSenderBytes...)
 	dataToHash = append(dataToHash, blockchainIDBytes...)
 	dataToHash = append(dataToHash, saltBytes...)
 
+	// Hash dos dados
 	innerHash := crypto.Keccak256Hash(dataToHash)
 
+	// Prefixa com o padrão Ethereum
 	prefix := []byte("\x19Ethereum Signed Message:\n32")
 	prefixedMessage := append(prefix, innerHash.Bytes()...)
 	finalHash := crypto.Keccak256Hash(prefixedMessage)
 
+	// Obtém a chave privada do ambiente
 	privateKeyHex := os.Getenv("PRIVATE_KEY_HEX")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
-		return "", fmt.Errorf("failed to load private key: %v", err)
+		return "", "", fmt.Errorf("failed to load private key: %v", err)
 	}
 
+	// Gera a assinatura
 	signatureBytes, err := crypto.Sign(finalHash.Bytes(), privateKey)
 	if err != nil {
-		return "", fmt.Errorf("failed to sign data: %v", err)
+		return "", "", fmt.Errorf("failed to sign data: %v", err)
 	}
 
-	return "0x" + hex.EncodeToString(signatureBytes), nil
+	// Ajustar o valor de 'v' na assinatura
+	signatureBytes[64] += 27
+
+	// Retorna o hash e a assinatura
+	return "0x" + hex.EncodeToString(signatureBytes), finalHash.Hex(), nil
 }
+
+
+
+// recoverPublicKey faz o recover da chave pública a partir do hash e assinatura
+func recoverPublicKey(hash string, signature string) (*ecdsa.PublicKey, error) {
+	// Decodifica o hash
+	hashBytes, err := hex.DecodeString(hash[2:]) // Remove o "0x"
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode hash: %v", err)
+	}
+
+	// Decodifica a assinatura
+	signatureBytes, err := hex.DecodeString(signature[2:]) // Remove o "0x"
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signature: %v", err)
+	}
+
+	// A assinatura precisa estar no formato correto (com 'v')
+	if len(signatureBytes) != 65 {
+		return nil, fmt.Errorf("invalid signature length: %d", len(signatureBytes))
+	}
+
+	// Faz o recover da chave pública
+	publicKey, err := crypto.SigToPub(hashBytes, signatureBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to recover public key: %v", err)
+	}
+
+	return publicKey, nil
+}
+
 
 // Handler para testar InitiateDeployTransaction
 func handleDeployTransaction(c *gin.Context) {
@@ -193,11 +234,13 @@ func handleDeployTransaction(c *gin.Context) {
 	blockchainID := uint64(80002)
 
 	// Gerar a assinatura
-	signature, err := generateSignature(contractAddress, req.Owner, req.Salt, blockchainID)
+	signature, finalHash, err := generateSignature(contractAddress, req.Owner, req.Salt, blockchainID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate signature", "details": err.Error()})
 		return
 	}
+	fmt.Printf("finalHash: %s\n", finalHash)
+	fmt.Printf("signature: %s\n", signature)
 
 	// Iniciar a transação de deploy
 	transactionID, err := InitiateDeployTransaction(
@@ -229,15 +272,19 @@ func handleMintTransaction(c *gin.Context) {
 		return
 	}
 
-	contractAddress := "0x841e6D1dcf65ca10e2f04D3c04c837B6dba5a673"
+	contractAddress := "0x2019158cA6820188875C4ecCFf875B6F849E77bc"
 	blockchainID := uint64(80002)
 
 	// Gerar a assinatura
-	signature, err := generateSignature(contractAddress, req.Owner, req.Salt, blockchainID)
+	signature, finalHash, err := generateSignature(contractAddress, req.Owner, req.Salt, blockchainID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate signature", "details": err.Error()})
+		fmt.Sprintf("%x", signature)
 		return
 	}
+	fmt.Printf("finalHash: %s\n", finalHash)
+	fmt.Printf("signature: %s\n", signature)
+	
 
 	// Iniciar a transação de mint
 	transactionID, err := InitiateMintTransaction(
@@ -390,7 +437,7 @@ func handleMintTransactionSmartWallet(c *gin.Context) {
 	}
 
 	// Definições
-	contractAddress := "0x841e6D1dcf65ca10e2f04D3c04c837B6dba5a673"
+	contractAddress := "0x2019158cA6820188875C4ecCFf875B6F849E77bc"
 	blockchainID := uint64(80002)
 
 	// Gerar hash para assinatura
@@ -427,6 +474,64 @@ func handleMintTransactionSmartWallet(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"transactionID": transactionID})
 }
 
+// Handler para recuperar a public key de uma assinatura
+func handleRecoverPublicKey(c *gin.Context) {
+	// Estrutura para os dados da requisição
+	type RecoverRequest struct {
+		Hash      string `json:"hash"`
+		Signature string `json:"signature"`
+	}
+
+	// Estrutura para os dados da resposta
+	type RecoverResponse struct {
+		PublicKey string `json:"publicKey"`
+		Address   string `json:"address"`
+	}
+
+	var req RecoverRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		return
+	}
+
+	// Decodifica o hash
+	hashBytes, err := hex.DecodeString(strings.TrimPrefix(req.Hash, "0x"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid hash format", "details": err.Error()})
+		return
+	}
+
+	// Decodifica a assinatura
+	signatureBytes, err := hex.DecodeString(strings.TrimPrefix(req.Signature, "0x"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid signature format", "details": err.Error()})
+		return
+	}
+
+	// Verifica o tamanho da assinatura
+	if len(signatureBytes) != 65 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid signature length"})
+		return
+	}
+
+	// Faz o recover da chave pública
+	publicKey, err := crypto.SigToPub(hashBytes, signatureBytes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to recover public key", "details": err.Error()})
+		return
+	}
+
+	// Converte a chave pública para um endereço Ethereum
+	address := crypto.PubkeyToAddress(*publicKey)
+
+	// Retorna a chave pública e o endereço
+	c.JSON(http.StatusOK, RecoverResponse{
+		PublicKey: hex.EncodeToString(crypto.FromECDSAPub(publicKey)),
+		Address:   address.Hex(),
+	})
+}
+
+
 // Função auxiliar para gerar os dados a serem assinados
 func generateDataToSign(contractAddress, msgSender, salt string, blockchainID uint64) ([]byte, error) {
 	contractAddressBytes := common.HexToAddress(contractAddress).Bytes()
@@ -456,8 +561,16 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	r := gin.Default()
-	r.Use(cors.Default())
+	 // Configura o modo do Gin
+	 gin.SetMode(os.Getenv("GIN_MODE"))
+
+	 // Cria um novo router
+	 r := gin.New()
+ 
+	 // Configuração de middlewares e CORS
+	 r.Use(gin.Logger())
+	 r.Use(gin.Recovery())
+	 r.Use(cors.Default())
 
 	// Rotas POST
 	r.POST("/deploy", handleDeployTransaction)
@@ -465,6 +578,7 @@ func main() {
 
 	r.POST("/deploy-smart-wallet", handleDeployTransactionSmartWallet)
 	r.POST("/mint-smart-wallet", handleMintTransactionSmartWallet)
+	r.POST("/recover-public-key", handleRecoverPublicKey)
 
 
 	log.Println("Server running on port 8080")
